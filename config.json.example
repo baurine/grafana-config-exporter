@@ -1,0 +1,5 @@
+{
+  "grafana_server": "",
+  "grafana_api_key": "",
+  "target_db_uids": [""]
+}
