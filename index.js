@@ -47,22 +47,42 @@ async function fetchDbDetail(dbUid) {
   }
 
   const dbDetail = detail.data.dashboard
-  return {
+  let unitFormats = []
+  const simplifiedDetail = {
+    units: [],
+
     uid: dbDetail.uid,
     title: dbDetail.title,
-    panels: (dbDetail.panels || []).map(panel => ({
-      id: panel.id,
-      title: panel.title,
-      targets: panel.targets,
-      subPanels: (panel.panels || []).map(subPanel => ({
-        id: subPanel.id,
-        title: subPanel.title,
-        description: subPanel.description,
-        targets: subPanel.targets,
-        yaxes: subPanel.yaxes
-      }))
-    }))
+
+    panels: (dbDetail.panels || []).map(panel => {
+      if (panel.yaxes) {
+        unitFormats.push(panel.yaxes[0].format)
+      }
+      return {
+        id: panel.id,
+        title: panel.title,
+
+        targets: transformTargets(panel.targets),
+        yaxes: panel.yaxes,
+
+        subPanels: (panel.panels || []).map(subPanel => {
+          if (subPanel.yaxes) {
+            unitFormats.push(subPanel.yaxes[0].format)
+          }
+          return {
+            id: subPanel.id,
+            title: subPanel.title,
+            description: subPanel.description,
+
+            targets: transformTargets(subPanel.targets),
+            yaxes: subPanel.yaxes
+          }
+        })
+      }
+    })
   }
+  simplifiedDetail.units = [...new Set(unitFormats)]
+  return simplifiedDetail
 }
 
 function parseArgv() {
@@ -79,6 +99,65 @@ function parseArgv() {
     }
   })
   return arguments
+}
+
+function transformTargets(targets) {
+  if (targets === undefined) {
+    return undefined
+  }
+  return targets.map(target => ({
+    newExpr: genNewPromQL(target.expr, 'PLACE_HOLDER'),
+    ...target,
+  }))
+}
+
+// 在原始的 promQL 中添加额外的 label
+// 比如 sum(load1) => sum(load1{inspectionId="xxx"})
+function genNewPromQL(oriPromQL, toInjectStr) {
+  // example: histogram_quantile(0.999, sum(rate(pd_client_cmd_handle_cmds_duration_seconds_bucket{type=\"tso\"}[1m])) by (le))
+  // 1. 先找 {}: load1{instance="aaa"}[1m]
+  // 2. 没有再找 []: load1[5m]
+  // 3. 再找 ): sum(load1)
+  // 4. 最后就是单独的 metric，比如 load1
+
+  let pos1,
+    pos2,
+    newExpr = oriPromQL
+  pos1 = oriPromQL.indexOf('{')
+  if (pos1 > 0) {
+    // {}
+    pos2 = oriPromQL.indexOf('}')
+    const labels = oriPromQL.slice(pos1 + 1, pos2)
+    let labelArr = labels.split(',')
+    labelArr = labelArr.filter(label => !label.split('=')[1].startsWith('"$'))
+    labelArr.push(toInjectStr)
+    console.log(labelArr)
+    const newLabels = labelArr.join(',')
+    newExpr =
+      oriPromQL.slice(0, pos1) +
+      '{' +
+      newLabels +
+      '}' +
+      oriPromQL.slice(pos2 + 1)
+    return newExpr
+  }
+  // []
+  pos1 = oriPromQL.indexOf('[')
+  if (pos1 > 0) {
+    newExpr =
+      oriPromQL.slice(0, pos1) + '{' + toInjectStr + '}' + oriPromQL.slice(pos1)
+    return newExpr
+  }
+  // )
+  pos1 = oriPromQL.indexOf(')')
+  if (pos1 > 0) {
+    newExpr =
+      oriPromQL.slice(0, pos1) + '{' + toInjectStr + '}' + oriPromQL.slice(pos1)
+    return newExpr
+  }
+  // only metric
+  newExpr = oriPromQL + '{' + toInjectStr + '}'
+  return newExpr
 }
 
 async function main() {
