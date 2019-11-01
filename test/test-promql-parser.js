@@ -35,3 +35,16 @@ describe('test parser', function() {
     expect(parser.injectToTags('PLACE_HOLDER')).to.equal(injectedPromQL)
   })
 })
+
+describe('测试清除 PromQL 中的变量', function() {
+  it('应该清除变量', function() {
+    let promQL =
+      'sum(rate(tikv_engine_cache_efficiency{instance=~"$instance", db="$db", type="block_cache_hit"}[1m])) / (sum(rate(tikv_engine_cache_efficiency{db="$db", type="block_cache_hit"}[1m])) + sum(rate(tikv_engine_cache_efficiency{db="$db", type="block_cache_miss"}[1m])))'
+    let targetPromQL =
+      'sum(rate(tikv_engine_cache_efficiency{type="block_cache_hit", PLACE_HOLDER}[1m])) / (sum(rate(tikv_engine_cache_efficiency{type="block_cache_hit", PLACE_HOLDER}[1m])) + sum(rate(tikv_engine_cache_efficiency{type="block_cache_miss", PLACE_HOLDER}[1m])))'
+
+    let parser = new PromQLParser(promQL)
+    parser.parse()
+    expect(parser.injectToTags('PLACE_HOLDER', true)).to.equal(targetPromQL)
+  })
+})

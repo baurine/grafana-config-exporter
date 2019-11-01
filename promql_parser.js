@@ -102,7 +102,7 @@ class PromQLParser {
     return combineExprArr(this.exprArr)
   }
 
-  injectToTags(extraTag) {
+  injectToTags(extraTag, cleanVariablesInTags = false) {
     let newExprArr = [...this.exprArr]
     for (let i = 0; i < newExprArr.length; i++) {
       let curExpr = newExprArr[i]
@@ -116,6 +116,10 @@ class PromQLParser {
         // 有对应的 tags expr
         tagsExpr.val = tagsExpr.val
           .split(',')
+          .filter(tag =>
+            // 清除含变量的 tag，比如 instance=~"$instance"
+            cleanVariablesInTags ? tag.indexOf('"$') === -1 : true
+          )
           .concat(extraTag)
           .join(', ')
       } else {
