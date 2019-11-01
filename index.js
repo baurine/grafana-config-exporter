@@ -86,7 +86,7 @@ async function fetchDbDetail(dbUid) {
 }
 
 function parseArgv() {
-  const arguments = {}
+  let argus = {}
   process.argv.slice(2).map(element => {
     const matches = element.match('--([a-zA-Z0-9_]+)=(.*)')
     if (matches) {
@@ -95,10 +95,10 @@ function parseArgv() {
       if (key === 'db_uids') {
         value = value.split(',')
       }
-      arguments[key] = value
+      argus[key] = value
     }
   })
-  return arguments
+  return argus
 }
 
 function transformTargets(targets) {
@@ -107,10 +107,11 @@ function transformTargets(targets) {
   }
   return targets.map(target => ({
     newExpr: genNewPromQL(target.expr, 'PLACE_HOLDER'),
-    ...target,
+    ...target
   }))
 }
 
+// 要用递归，可能存在 sum(load1[1m]) / sum(load5[1m]) 这种情况
 // 在原始的 promQL 中添加额外的 label
 // 比如 sum(load1) => sum(load1{inspectionId="xxx"})
 function genNewPromQL(oriPromQL, toInjectStr) {
@@ -119,6 +120,7 @@ function genNewPromQL(oriPromQL, toInjectStr) {
   // 2. 没有再找 []: load1[5m]
   // 3. 再找 ): sum(load1)
   // 4. 最后就是单独的 metric，比如 load1
+  if (oriPromQL === '') return ''
 
   let pos1,
     pos2,
@@ -129,28 +131,41 @@ function genNewPromQL(oriPromQL, toInjectStr) {
     pos2 = oriPromQL.indexOf('}')
     const labels = oriPromQL.slice(pos1 + 1, pos2)
     let labelArr = labels.split(',')
-    labelArr = labelArr.filter(label => !label.split('=')[1].startsWith('"$'))
+    labelArr = labelArr
+      .filter(label => label.indexOf('"$') === -1)
+      .map(label => label.trim())
     labelArr.push(toInjectStr)
     console.log(labelArr)
-    const newLabels = labelArr.join(',')
-    newExpr =
-      oriPromQL.slice(0, pos1) +
-      '{' +
-      newLabels +
-      '}' +
-      oriPromQL.slice(pos2 + 1)
-    return newExpr
+    const newLabels = labelArr.join(', ')
+    newExpr = oriPromQL.slice(0, pos1) + '{' + newLabels + '}'
+    return newExpr + genNewPromQL(oriPromQL.slice(pos2 + 1), toInjectStr)
   }
   // []
   pos1 = oriPromQL.indexOf('[')
   if (pos1 > 0) {
+    pos2 = oriPromQL.indexOf(']')
     newExpr =
-      oriPromQL.slice(0, pos1) + '{' + toInjectStr + '}' + oriPromQL.slice(pos1)
-    return newExpr
+      oriPromQL.slice(0, pos1) +
+      '{' +
+      toInjectStr +
+      '}' +
+      oriPromQL.slice(pos1, pos2 + 1)
+    return newExpr + genNewPromQL(oriPromQL.slice(pos2 + 2), toInjectStr)
   }
   // )
   pos1 = oriPromQL.indexOf(')')
   if (pos1 > 0) {
+    pos2 = oriPromQL.lastIndexOf('(')
+    if (pos2 > pos1) {
+      newExpr =
+        oriPromQL.slice(0, pos1) +
+        '{' +
+        toInjectStr +
+        '}' +
+        oriPromQL.slice(pos1, pos2 + 1)
+      return newExpr + genNewPromQL(oriPromQL.slice(pos2 + 1), toInjectStr)
+    }
+
     newExpr =
       oriPromQL.slice(0, pos1) + '{' + toInjectStr + '}' + oriPromQL.slice(pos1)
     return newExpr
