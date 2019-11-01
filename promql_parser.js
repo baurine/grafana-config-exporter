@@ -7,6 +7,11 @@ function combineExprArr(exprArr) {
     .join('')
 }
 
+// load1 + load5
+// (sum(load1) + 5)
+// 5 + sum(load1)
+// '5' -> const_num
+// 'load1' -> metric
 function isNumber(str) {
   return !isNaN(parseFloat(str))
 }
@@ -14,7 +19,7 @@ function isNumber(str) {
 class PromQLParser {
   constructor(promQL) {
     this.promQL = promQL
-    this.exprArr = [] // item: {val: 'sum', type: 'sign|symbol|fn|metric|tags|duration|metric_tags|const_number', pos: 2}
+    this.exprArr = [] // each item: {val: 'sum', type: 'sign|symbol|fn|metric|tags|duration|metric_tags|const_number', pos: 2}
     this.curCommonChars = []
   }
 
@@ -27,12 +32,13 @@ class PromQLParser {
     this.curCommonChars = []
   }
 
-  // load1 + load5
-  // (sum(load1) + 5)
-  // 5 + sum(load1)
-  // '5' -> const_num
-  // 'load1' -> metric
-  judgeType() {}
+  enqueueMetricOrNumber(pos) {
+    if (isNumber(this.curCommonChars.join(''))) {
+      this.enqueExpr('const_number', pos)
+    } else {
+      this.enqueExpr('metric', pos)
+    }
+  }
 
   parse() {
     let i = 0
@@ -52,11 +58,7 @@ class PromQLParser {
             // ')' 之前，如果 tempChars.length > 0，则为 metric 或 const_number
             // 如果 tempChars 为数字，则为 const_number
             if (this.curCommonChars.length > 0) {
-              if (isNumber(this.curCommonChars.join(''))) {
-                this.enqueExpr('const_number', i)
-              } else {
-                this.enqueExpr('metric', i)
-              }
+              this.enqueueMetricOrNumber(i)
             }
             break
           case '{':
@@ -83,11 +85,7 @@ class PromQLParser {
       } else if (MATH_SIGNS.includes(char)) {
         // 如果 curCommonChars 不为空，那它有可能是 metric 或 const_number
         if (this.curCommonChars.length > 0) {
-          if (isNumber(this.curCommonChars.join(''))) {
-            this.enqueExpr('const_number', i)
-          } else {
-            this.enqueExpr('metric', i)
-          }
+          this.enqueueMetricOrNumber(i)
         }
         this.exprArr.push({ val: char, type: 'sign', pos: i })
       } else if (char !== ' ') {
@@ -96,11 +94,7 @@ class PromQLParser {
       }
     }
     if (this.curCommonChars.length > 0) {
-      if (isNumber(this.curCommonChars.join(''))) {
-        this.enqueExpr('const_number', i)
-      } else {
-        this.enqueExpr('metric', i)
-      }
+      this.enqueueMetricOrNumber(i)
     }
   }
 
