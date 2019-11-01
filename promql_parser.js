@@ -21,6 +21,8 @@ class PromQLParser {
     this.promQL = promQL
     this.exprArr = [] // each item: {val: 'sum', type: 'sign|symbol|fn|metric|tags|duration|metric_tags|const_number', pos: 2}
     this.curCommonChars = []
+
+    this.parse()
   }
 
   enqueExpr(exprType, curPos) {
@@ -132,4 +134,12 @@ class PromQLParser {
   }
 }
 
-module.exports = PromQLParser
+////////////////////////////////////////////
+
+function genNewPromQL(oriPromQL, placeholder) {
+  return new PromQLParser(oriPromQL).injectToTags(placeholder, true)
+}
+
+////////////////////////////////////////////
+
+module.exports = { PromQLParser, genNewPromQL }

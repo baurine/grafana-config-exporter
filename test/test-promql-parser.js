@@ -1,4 +1,4 @@
-const PromQLParser = require('../promql_parser')
+const { PromQLParser, genNewPromQL } = require('../promql_parser')
 const { describe } = require('mocha')
 const { expect } = require('chai')
 
@@ -6,9 +6,7 @@ describe('test parser', function() {
   it('shoule be success', function() {
     let promQL =
       '(sum(rate(tikv_storage_engine_async_request_duration_seconds_sum{type="write"}[5m]))+5)/sum(rate(tikv_storage_engine_async_request_duration_seconds_count{type="write"}[5m]))'
-
-    let parser = new PromQLParser(promQL)
-    parser.parse()
+    const parser = new PromQLParser(promQL)
 
     let targetPromQL =
       '(sum(rate(tikv_storage_engine_async_request_duration_seconds_sum{type="write"}[5m])) + 5) / sum(rate(tikv_storage_engine_async_request_duration_seconds_count{type="write"}[5m]))'
@@ -23,9 +21,7 @@ describe('test parser', function() {
 describe('test parser', function() {
   it('shoule be success', function() {
     let promQL = '(5+load1+load5)/(load5+load1+6)+5+load5'
-
-    let parser = new PromQLParser(promQL)
-    parser.parse()
+    const parser = new PromQLParser(promQL)
 
     let targetPromQL = '(5 + load1 + load5) / (load5 + load1 + 6) + 5 + load5'
     expect(parser.combine()).to.equal(targetPromQL)
@@ -43,8 +39,6 @@ describe('测试清除 PromQL 中的变量', function() {
     let targetPromQL =
       'sum(rate(tikv_engine_cache_efficiency{type="block_cache_hit", PLACE_HOLDER}[1m])) / (sum(rate(tikv_engine_cache_efficiency{type="block_cache_hit", PLACE_HOLDER}[1m])) + sum(rate(tikv_engine_cache_efficiency{type="block_cache_miss", PLACE_HOLDER}[1m])))'
 
-    let parser = new PromQLParser(promQL)
-    parser.parse()
-    expect(parser.injectToTags('PLACE_HOLDER', true)).to.equal(targetPromQL)
+    expect(genNewPromQL(promQL, 'PLACE_HOLDER')).to.equal(targetPromQL)
   })
 })

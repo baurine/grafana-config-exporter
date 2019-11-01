@@ -6,6 +6,8 @@ const BASE_URL = config.grafana_server
 const GRAFANA_API_KEY = config.grafana_api_key
 const TARGET_DB_UIDS = config.target_db_uids
 
+const { genNewPromQL } = require('./promql_parser')
+
 function parseResponse(res) {
   if (res.status === 204) {
     return {}
@@ -109,70 +111,6 @@ function transformTargets(targets) {
     newExpr: genNewPromQL(target.expr, 'PLACE_HOLDER'),
     ...target
   }))
-}
-
-// 要用递归，可能存在 sum(load1[1m]) / sum(load5[1m]) 这种情况
-// 在原始的 promQL 中添加额外的 label
-// 比如 sum(load1) => sum(load1{inspectionId="xxx"})
-function genNewPromQL(oriPromQL, toInjectStr) {
-  // example: histogram_quantile(0.999, sum(rate(pd_client_cmd_handle_cmds_duration_seconds_bucket{type=\"tso\"}[1m])) by (le))
-  // 1. 先找 {}: load1{instance="aaa"}[1m]
-  // 2. 没有再找 []: load1[5m]
-  // 3. 再找 ): sum(load1)
-  // 4. 最后就是单独的 metric，比如 load1
-  if (oriPromQL === '') return ''
-
-  let pos1,
-    pos2,
-    newExpr = oriPromQL
-  pos1 = oriPromQL.indexOf('{')
-  if (pos1 > 0) {
-    // {}
-    pos2 = oriPromQL.indexOf('}')
-    const labels = oriPromQL.slice(pos1 + 1, pos2)
-    let labelArr = labels.split(',')
-    labelArr = labelArr
-      .filter(label => label.indexOf('"$') === -1)
-      .map(label => label.trim())
-    labelArr.push(toInjectStr)
-    console.log(labelArr)
-    const newLabels = labelArr.join(', ')
-    newExpr = oriPromQL.slice(0, pos1) + '{' + newLabels + '}'
-    return newExpr + genNewPromQL(oriPromQL.slice(pos2 + 1), toInjectStr)
-  }
-  // []
-  pos1 = oriPromQL.indexOf('[')
-  if (pos1 > 0) {
-    pos2 = oriPromQL.indexOf(']')
-    newExpr =
-      oriPromQL.slice(0, pos1) +
-      '{' +
-      toInjectStr +
-      '}' +
-      oriPromQL.slice(pos1, pos2 + 1)
-    return newExpr + genNewPromQL(oriPromQL.slice(pos2 + 2), toInjectStr)
-  }
-  // )
-  pos1 = oriPromQL.indexOf(')')
-  if (pos1 > 0) {
-    pos2 = oriPromQL.lastIndexOf('(')
-    if (pos2 > pos1) {
-      newExpr =
-        oriPromQL.slice(0, pos1) +
-        '{' +
-        toInjectStr +
-        '}' +
-        oriPromQL.slice(pos1, pos2 + 1)
-      return newExpr + genNewPromQL(oriPromQL.slice(pos2 + 1), toInjectStr)
-    }
-
-    newExpr =
-      oriPromQL.slice(0, pos1) + '{' + toInjectStr + '}' + oriPromQL.slice(pos1)
-    return newExpr
-  }
-  // only metric
-  newExpr = oriPromQL + '{' + toInjectStr + '}'
-  return newExpr
 }
 
 async function main() {
