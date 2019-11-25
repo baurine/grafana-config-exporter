@@ -1,4 +1,4 @@
-const PROMQL_SYMBOLS = "()[]{}";
+const PROMQL_SYMBOLS = "(){}[]";
 const MATH_SIGNS = "+-*/";
 
 function combineExprArr(exprArr) {
@@ -152,7 +152,7 @@ class PromQLParser {
     return combineExprArr(this.exprArr);
   }
 
-  injectToTags(extraTag, cleanVariablesInTags = false) {
+  insertTag(extraTag, cleanVariablesInTags = true) {
     let newExprArr = [...this.exprArr];
     for (let i = 0; i < newExprArr.length; i++) {
       let curExpr = newExprArr[i];
@@ -164,8 +164,8 @@ class PromQLParser {
       let tagsExpr = newExprArr[i + 2];
       if (tagsExpr && tagsExpr.type === "tags") {
         // 有对应的 tags expr
-        tagsExpr.val = tagsExpr.val
-          .split(",")
+        let tagsArr = tagsExpr.val.split(",");
+        tagsArr = tagsArr
           .map(tag => tag.trim())
           .filter(tag => tag !== "")
           .filter(tag =>
@@ -173,10 +173,10 @@ class PromQLParser {
             cleanVariablesInTags ? tag.indexOf('"$') === -1 : true
           );
         if (extraTag !== "") {
-          tagsExpr.val = tagsExpr.val.concat(extraTag);
+          tagsArr = tagsArr.concat(extraTag);
         }
-        tagsExpr.val = tagsExpr.val.join(", ");
-      } else {
+        tagsExpr.val = tagsArr.join(", ");
+      } else if (extraTag !== "") {
         // 没有 tags expr
         curExpr.val = curExpr.val + "{" + extraTag + "}";
         curExpr.type = "metric_tags";
@@ -188,9 +188,9 @@ class PromQLParser {
 
 ////////////////////////////////////////////
 
-function genNewPromQL(oriPromQL, placeholder) {
+function genNewPromQL(oriPromQL, extraTag) {
   const parser = new PromQLParser(oriPromQL);
-  return parser.injectToTags(placeholder, true);
+  return parser.insertTag(extraTag);
 }
 
 ////////////////////////////////////////////

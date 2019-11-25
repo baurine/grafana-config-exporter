@@ -33,14 +33,14 @@ describe("test parser", function() {
     const parser = new PromQLParser(promQLNormal);
     let injectedPromQL =
       '(sum(rate(tikv_storage_engine_async_request_duration_seconds_sum{type="write", PLACE_HOLDER}[5m])) + 5) / sum(rate(tikv_storage_engine_async_request_duration_seconds_count{type="write", PLACE_HOLDER}[5m]))';
-    expect(parser.injectToTags("PLACE_HOLDER")).to.equal(injectedPromQL);
+    expect(parser.insertTag("PLACE_HOLDER")).to.equal(injectedPromQL);
   });
 
   it("should inject the placeholder correctly", function() {
     const parser = new PromQLParser(promQLMetrics);
     let injectedPromQL =
       "(5 + load1{PLACE_HOLDER} + load5{PLACE_HOLDER}) / (load5{PLACE_HOLDER} + load1{PLACE_HOLDER} + 6) + 5 + load5{PLACE_HOLDER}";
-    expect(parser.injectToTags("PLACE_HOLDER")).to.equal(injectedPromQL);
+    expect(parser.insertTag("PLACE_HOLDER")).to.equal(injectedPromQL);
   });
 
   it("should clean the variables in the PromQL", function() {
