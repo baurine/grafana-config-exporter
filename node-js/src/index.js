@@ -1,7 +1,7 @@
 const fetch = require("node-fetch");
 const fs = require("fs");
 
-const config = require("./config.json");
+const config = require("../config.json");
 const BASE_URL = config.grafana_server;
 const GRAFANA_API_KEY = config.grafana_api_key;
 const TARGET_DB_UIDS = config.target_db_uids;
