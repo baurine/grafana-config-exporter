@@ -1,8 +1,11 @@
 import fetch, { Response } from "node-fetch";
 import { genNewPromQL } from "./promql-parser";
+import { getConfig } from "./config-parser";
 
-const BASE_URL = "";
-const GRAFANA_API_KEY = "";
+const config = getConfig();
+const BASE_URL = config.grafana_server;
+const GRAFANA_API_KEY = config.grafana_api_key;
+const PROM_PLACE_HOLDER = config.promql_placeholder;
 
 interface IRes {
   data?: any;
@@ -38,7 +41,7 @@ async function request(apiPath: string): Promise<IRes> {
 
 ////////////////////////////////
 
-async function searchDashboards() {
+export async function searchDashboards() {
   const url = "search?folderIds=0&type=dash-db";
   const res = await request(url);
   if (res.data) {
@@ -47,7 +50,7 @@ async function searchDashboards() {
   return undefined;
 }
 
-async function fetchDbDetail(dbUid: string) {
+export async function fetchDbDetail(dbUid: string) {
   const url = `dashboards/uid/${dbUid}`;
   const res = await request(url);
   if (res.err) {
@@ -58,8 +61,8 @@ async function fetchDbDetail(dbUid: string) {
 
 ////////////////////////////////
 
-function convertDbDetail(dbDetail: any) {
-  const simplifiedDetail = {
+export function convertDbDetail(dbDetail: any) {
+  return {
     sectionKey: dbDetail.uid,
     title: dbDetail.title,
 
@@ -94,7 +97,6 @@ function convertDbDetail(dbDetail: any) {
       return newPanel;
     })
   };
-  return simplifiedDetail;
 }
 
 function transformTargets(targets: any[]) {
@@ -102,7 +104,7 @@ function transformTargets(targets: any[]) {
     return undefined;
   }
   return targets.map(target => ({
-    expr: genNewPromQL(target.expr, ""),
+    expr: genNewPromQL(target.expr, PROM_PLACE_HOLDER),
     legendFormat: target.legendFormat
   }));
 }
