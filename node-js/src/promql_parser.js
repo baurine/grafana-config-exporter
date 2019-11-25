@@ -21,10 +21,11 @@ function isNumber(str) {
 class PromQLParser {
   constructor(promQL) {
     this.promQL = promQL;
-    this.exprArr = []; // each item: {val: 'sum', type: 'sign|symbol|fn|metric|tags|duration|metric_tags|const_number|by|remain', pos: 2}
+    this.exprArr = []; // each item: {val: 'sum', type: 'sign|symbol|fn|metric|tags|duration|metric_tags|const_number|by|by_target', pos: 2}
     this.curCommonChars = [];
 
     this.parse();
+    // console.log(this.exprArr);
   }
 
   enqueExpr(exprType, curPos) {
@@ -46,13 +47,14 @@ class PromQLParser {
 
   parse() {
     let i = 0;
-    let reachEnd = false; // 以 by 为标准
     let enterTags = false;
-    for (i = 0; i < this.promQL.length; i++) {
+    let handleBy = false;
+    while (i < this.promQL.length) {
       const char = this.promQL[i];
 
       if (enterTags && char !== "}") {
         this.curCommonChars.push(char);
+        i++;
         continue;
       }
 
@@ -64,14 +66,16 @@ class PromQLParser {
             if (this.curCommonChars.length > 0) {
               if (this.curCommonChars.join("") === "by") {
                 // parse 结束
-                reachEnd = true;
                 this.enqueExpr("by", i);
                 // enque 剩下所有
+                const byEnd = this.promQL.indexOf(")", i);
                 this.exprArr.push({
-                  val: this.promQL.slice(i),
-                  type: "remain",
+                  val: this.promQL.slice(i, byEnd + 1),
+                  type: "by_target",
                   pos: i
                 });
+                i = byEnd + 1;
+                handleBy = true;
               } else {
                 this.enqueExpr("fn", i);
               }
@@ -105,7 +109,7 @@ class PromQLParser {
             this.enqueExpr("duration", i);
             break;
         }
-        if (!reachEnd) {
+        if (!handleBy) {
           // 放入 exprArr 中
           this.exprArr.push({ val: char, type: "symbol", pos: i });
         }
@@ -134,9 +138,10 @@ class PromQLParser {
           this.curCommonChars.push(" ");
         }
       }
-      if (reachEnd) {
-        break;
+      if (!handleBy) {
+        i++;
       }
+      handleBy = false;
     }
     if (this.curCommonChars.length > 0) {
       this.enqueueMetricOrNumber(i);
@@ -162,6 +167,7 @@ class PromQLParser {
         tagsExpr.val = tagsExpr.val
           .split(",")
           .map(tag => tag.trim())
+          .filter(tag => tag !== "")
           .filter(tag =>
             // 清除含变量的 tag，比如 instance=~"$instance"
             cleanVariablesInTags ? tag.indexOf('"$') === -1 : true
