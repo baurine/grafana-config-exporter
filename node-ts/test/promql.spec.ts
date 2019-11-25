@@ -1,4 +1,4 @@
-import { genNewPromQL } from "../src/promql_parser";
+import { genNewPromQL } from "../src/promql-parser";
 
 describe("test parser", function() {
   const promQLNormal =
