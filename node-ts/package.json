@@ -10,8 +10,12 @@
   },
   "author": "baurine",
   "license": "ISC",
+  "dependencies": {
+    "node-fetch": "^2.6.0"
+  },
   "devDependencies": {
     "@types/jest": "^24.0.23",
+    "@types/node-fetch": "^2.5.4",
     "jest": "^24.9.0",
     "ts-jest": "^24.2.0",
     "typescript": "^3.7.2"
