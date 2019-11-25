@@ -19,7 +19,6 @@ type ExprItemType =
 interface ExprItem {
   val: string;
   type: ExprItemType;
-  pos: number;
 }
 
 function combineExprArr(exprArr: ExprItem[]) {
@@ -52,22 +51,21 @@ class PromQLParser {
     this.parse();
   }
 
-  enqueExpr(exprType: ExprItemType, curPos: number) {
+  enqueExpr(exprType: ExprItemType) {
     this.exprArr.push({
       val: this.curCommonChars.join(""),
-      type: exprType,
-      pos: curPos - this.curCommonChars.length
+      type: exprType
     });
     this.curCommonChars = [];
   }
 
   // PromQL: load1 + 5
   // 应该视 5 为 const_number
-  enqueueMetricOrNumber(pos: number) {
+  enqueueMetricOrNumber() {
     if (isNumber(this.curCommonChars.join(""))) {
-      this.enqueExpr("const_number", pos);
+      this.enqueExpr("const_number");
     } else {
-      this.enqueExpr("metric", pos);
+      this.enqueExpr("metric");
     }
   }
 
@@ -86,18 +84,17 @@ class PromQLParser {
             if (this.curCommonChars.length > 0) {
               if (this.curCommonChars.join("") === "by") {
                 // parse 结束
-                this.enqueExpr("by", i);
+                this.enqueExpr("by");
                 // enque 剩下所有
                 const byEnd = this.promQL.indexOf(")", i);
                 this.exprArr.push({
                   val: this.promQL.slice(i, byEnd + 1),
-                  type: "by_target",
-                  pos: i
+                  type: "by_target"
                 });
                 i = byEnd + 1;
                 handleBy = true;
               } else {
-                this.enqueExpr("fn", i);
+                this.enqueExpr("fn");
               }
             }
             break;
@@ -105,49 +102,48 @@ class PromQLParser {
             // ')' 之前，如果 tempChars.length > 0，则为 metric 或 const_number
             // 如果 tempChars 为数字，则为 const_number
             if (this.curCommonChars.length > 0) {
-              this.enqueueMetricOrNumber(i);
+              this.enqueueMetricOrNumber();
             }
             break;
           case "{":
             // '{' 之前是 metric，this.tempChars 必须大于 0
-            this.enqueExpr("metric", i);
+            this.enqueExpr("metric");
 
-            this.exprArr.push({ val: "{", type: "symbol", pos: i });
+            this.exprArr.push({ val: "{", type: "symbol" });
             const tagsEnd = this.promQL.indexOf("}", i);
             this.exprArr.push({
               val: this.promQL.slice(i + 1, tagsEnd),
-              type: "tags",
-              pos: i
+              type: "tags"
             });
-            this.exprArr.push({ val: "}", type: "symbol", pos: tagsEnd });
+            this.exprArr.push({ val: "}", type: "symbol" });
             i = tagsEnd + 1;
             handleTags = true;
             break;
           case "}":
             // '}' 之前是 tags
-            this.enqueExpr("tags", i);
+            this.enqueExpr("tags");
             break;
           case "[":
             // '[' 之前，如果 tempChars 大于 0，则为 metric
             if (this.curCommonChars.length > 0) {
-              this.enqueExpr("metric", i);
+              this.enqueExpr("metric");
             }
             break;
           case "]":
             // ']' 之前是 duration, this.tempChars 必须大于 0
-            this.enqueExpr("duration", i);
+            this.enqueExpr("duration");
             break;
         }
         if (!handleBy && !handleTags) {
           // 放入 exprArr 中
-          this.exprArr.push({ val: char, type: "symbol", pos: i });
+          this.exprArr.push({ val: char, type: "symbol" });
         }
       } else if (MATH_SIGNS.includes(char)) {
         // 如果 curCommonChars 不为空，那它有可能是 metric 或 const_number
         if (this.curCommonChars.length > 0) {
-          this.enqueueMetricOrNumber(i);
+          this.enqueueMetricOrNumber();
         }
-        this.exprArr.push({ val: char, type: "sign", pos: i });
+        this.exprArr.push({ val: char, type: "sign" });
       } else if (char !== " ") {
         // common char except ' '
         this.curCommonChars.push(char);
@@ -163,7 +159,7 @@ class PromQLParser {
       handleTags = false;
     }
     if (this.curCommonChars.length > 0) {
-      this.enqueueMetricOrNumber(i);
+      this.enqueueMetricOrNumber();
     }
   }
 
