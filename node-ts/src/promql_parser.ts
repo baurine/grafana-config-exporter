@@ -73,16 +73,10 @@ class PromQLParser {
 
   parse() {
     let i = 0;
-    let enterTags = false;
+    let handleTags = false;
     let handleBy = false;
     while (i < this.promQL.length) {
       const char = this.promQL[i];
-
-      if (enterTags && char !== "}") {
-        this.curCommonChars.push(char);
-        i++;
-        continue;
-      }
 
       if (PROMQL_SYMBOLS.includes(char)) {
         // symbol
@@ -117,12 +111,21 @@ class PromQLParser {
           case "{":
             // '{' 之前是 metric，this.tempChars 必须大于 0
             this.enqueExpr("metric", i);
-            enterTags = true;
+
+            this.exprArr.push({ val: "{", type: "symbol", pos: i });
+            const tagsEnd = this.promQL.indexOf("}", i);
+            this.exprArr.push({
+              val: this.promQL.slice(i + 1, tagsEnd),
+              type: "tags",
+              pos: i
+            });
+            this.exprArr.push({ val: "}", type: "symbol", pos: tagsEnd });
+            i = tagsEnd + 1;
+            handleTags = true;
             break;
           case "}":
             // '}' 之前是 tags
             this.enqueExpr("tags", i);
-            enterTags = false;
             break;
           case "[":
             // '[' 之前，如果 tempChars 大于 0，则为 metric
@@ -135,27 +138,16 @@ class PromQLParser {
             this.enqueExpr("duration", i);
             break;
         }
-        if (!handleBy) {
+        if (!handleBy && !handleTags) {
           // 放入 exprArr 中
           this.exprArr.push({ val: char, type: "symbol", pos: i });
         }
       } else if (MATH_SIGNS.includes(char)) {
         // 如果 curCommonChars 不为空，那它有可能是 metric 或 const_number
-        // edge case: "sum(rate(tikv_thread_cpu_seconds_total{name=~\"apply_[0-9]+\"}[1m])) by (instance)"
-        // edge case: "go_memstats_heap_inuse_bytes{job=~\"tidb.*\"}"
-        // 如果 * 前面是 . 号，那么这个 * 号并不是数学符号
         if (this.curCommonChars.length > 0) {
-          // TODO: remove
-          if (this.curCommonChars[this.curCommonChars.length - 1] === ".") {
-            // 说明是通配符
-            this.curCommonChars.push(char);
-          } else {
-            this.enqueueMetricOrNumber(i);
-            this.exprArr.push({ val: char, type: "sign", pos: i });
-          }
-        } else {
-          this.exprArr.push({ val: char, type: "sign", pos: i });
+          this.enqueueMetricOrNumber(i);
         }
+        this.exprArr.push({ val: char, type: "sign", pos: i });
       } else if (char !== " ") {
         // common char except ' '
         this.curCommonChars.push(char);
@@ -164,10 +156,11 @@ class PromQLParser {
           this.curCommonChars.push(" ");
         }
       }
-      if (!handleBy) {
+      if (!handleBy && !handleTags) {
         i++;
       }
       handleBy = false;
+      handleTags = false;
     }
     if (this.curCommonChars.length > 0) {
       this.enqueueMetricOrNumber(i);
