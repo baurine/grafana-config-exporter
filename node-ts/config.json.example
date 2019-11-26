@@ -1,0 +1,9 @@
+{
+  "grafana_server": "",
+  "grafana_api_key": "",
+
+  "db_uids": "",
+  "promql_tag_placeholder": "",
+  "clean_variables_in_tag": true,
+  "keep_ori_expr": true
+}

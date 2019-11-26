@@ -5,7 +5,8 @@ import { getConfig } from "./config-parser";
 const config = getConfig();
 const BASE_URL = config.grafana_server;
 const GRAFANA_API_KEY = config.grafana_api_key;
-const PROM_PLACE_HOLDER = config.promql_placeholder;
+const PROM_TAG_PLACE_HOLDER = config.promql_tag_placeholder;
+const CLEAN_VAR_IN_TAG = config.clean_variables_in_tag;
 
 interface IRes {
   data?: any;
@@ -47,7 +48,7 @@ export async function searchDashboards() {
   if (res.data) {
     return (res.data as any[]).map(db => db.uid);
   }
-  return undefined;
+  return [];
 }
 
 export async function fetchDbDetail(dbUid: string) {
@@ -61,7 +62,43 @@ export async function fetchDbDetail(dbUid: string) {
 
 ////////////////////////////////
 
-export function convertDbDetail(dbDetail: any) {
+export interface ISection {
+  sectionKey: string;
+  title: string;
+
+  panels: IPanel[];
+}
+
+export interface IPanel {
+  panelKey: string;
+  title: string;
+
+  subPanels: ISubPanel[];
+}
+
+export interface ISubPanel {
+  subPanelKey: string;
+
+  title: string;
+  targets: ITarget[];
+  yaxis: IYaxis;
+}
+
+export interface ITarget {
+  _ori?: string;
+  expr: string;
+  legendFormat: string;
+}
+
+// rename to unitFormat?
+export interface IYaxis {
+  format: string;
+  decimals?: number;
+}
+
+////////////////////////////////
+
+export function convertDbDetail(dbDetail: any): ISection {
   return {
     sectionKey: dbDetail.uid,
     title: dbDetail.title,
@@ -78,8 +115,7 @@ export function convertDbDetail(dbDetail: any) {
 
             targets: transformTargets(subPanel.targets),
             yaxis: (subPanel.yaxes || []).map((yaxis: any) => ({
-              format: yaxis.format,
-              logBase: yaxis.logBase
+              format: yaxis.format
             }))[0]
           };
         })
@@ -89,8 +125,7 @@ export function convertDbDetail(dbDetail: any) {
           title: panel.title,
           targets: transformTargets(panel.targets),
           yaxis: (panel.yaxes || []).map((yaxis: any) => ({
-            format: yaxis.format,
-            logBase: yaxis.logBase
+            format: yaxis.format
           }))[0]
         });
       }
@@ -99,12 +134,13 @@ export function convertDbDetail(dbDetail: any) {
   };
 }
 
-function transformTargets(targets: any[]) {
+function transformTargets(targets: any[]): ITarget[] | undefined {
   if (targets === undefined) {
     return undefined;
   }
   return targets.map(target => ({
-    expr: genNewPromQL(target.expr, PROM_PLACE_HOLDER),
+    _ori: config.keep_ori_expr ? target.expr : undefined,
+    expr: genNewPromQL(target.expr, PROM_TAG_PLACE_HOLDER, CLEAN_VAR_IN_TAG),
     legendFormat: target.legendFormat
   }));
 }
