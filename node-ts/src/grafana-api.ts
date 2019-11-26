@@ -138,9 +138,11 @@ function transformTargets(targets: any[]): ITarget[] | undefined {
   if (targets === undefined) {
     return undefined;
   }
-  return targets.map(target => ({
-    _ori: config.keep_ori_expr ? target.expr : undefined,
-    expr: genNewPromQL(target.expr, PROM_TAG_PLACE_HOLDER, CLEAN_VAR_IN_TAG),
-    legendFormat: target.legendFormat
-  }));
+  return targets
+    .filter(target => target.hide === false)
+    .map(target => ({
+      _ori: config.keep_ori_expr ? target.expr : undefined,
+      expr: genNewPromQL(target.expr, PROM_TAG_PLACE_HOLDER, CLEAN_VAR_IN_TAG),
+      legendFormat: target.legendFormat
+    }));
 }
