@@ -76,6 +76,9 @@ class PromQLParser {
     }
   }
 
+  // 算法：
+  // 因为不会编译原理，所以采用简单粗暴的方法，逐个字符进行分析
+  // 后面考虑用词法解析的方法来解析，这也应该是正确的方法
   parse() {
     let i = 0;
     let handleTags = false;
