@@ -1,11 +1,13 @@
 const PROMQL_SYMBOLS = "(){}[]"; // symbol
 const MATH_SIGNS = "+-*/"; // sign
+const COMPARE_SIGNS = "<>="; // compare
 
 // PromQL examples:
 // histogram_quantile(0.99, sum(rate(tidb_session_transaction_duration_seconds_bucket[1m]) + 10) by (le, sql_type))
 // sum(increase(node_cpu_seconds_total{mode!="idle"}[3m])) by (instance) / sum(increase(node_cpu_seconds_total[3m])) by (instance)
 type ExprItemType =
   | "sign" // `+-*/`
+  | "compare" // <>=
   | "symbol" // `(){}[]`
   | "fn" // `histogram_quantile`, `sum`, `rate`, `increase`...
   | "metric" // `node_cpu_seconds_total`, content before '{}'
@@ -24,7 +26,9 @@ interface ExprItem {
 function combineExprArr(exprArr: ExprItem[]) {
   return exprArr
     .map(item =>
-      item.type === "sign" || item.type === "by" ? ` ${item.val} ` : item.val
+      item.type === "sign" || item.type === "compare" || item.type === "by"
+        ? ` ${item.val} `
+        : item.val
     )
     .join("");
 }
@@ -134,9 +138,30 @@ class PromQLParser {
           this.exprArr.push({ val: char, type: "symbol" });
         }
       } else if (MATH_SIGNS.includes(char)) {
-        // 如果 curCommonChars 不为空，那它有可能是 metric 或 const_number
-        this.enqueueMetricOrNumber();
-        this.exprArr.push({ val: char, type: "sign" });
+        // 减号 `-`，也可能是用于标志负数，比如有个 grafana 中的 PromQL 表达式是 `sum(...) by (instance) > -30` (怀疑这个表达式是不是能真的工作哦，那结果岂不是只有 0 和 1)
+        let isNegative = false;
+        if (char === "-") {
+          const lastExpr = this.exprArr[this.exprArr.length - 1];
+          if (lastExpr && lastExpr.type === "compare") {
+            // 前一个符号是比较值，说明是负号，作为普通字符放放 curCommonChars
+            this.curCommonChars.push(char);
+            isNegative = true;
+          }
+        }
+        if (!isNegative) {
+          this.enqueueMetricOrNumber();
+          this.exprArr.push({ val: char, type: "sign" });
+        }
+      } else if (COMPARE_SIGNS.includes(char)) {
+        if (char !== "=") {
+          this.enqueueMetricOrNumber();
+          this.exprArr.push({ val: char, type: "compare" });
+        } else {
+          this.curCommonChars.push(char);
+          if (this.curCommonChars.length === 2) {
+            this.enqueExpr("compare");
+          }
+        }
       } else if (char !== " ") {
         // common char except ' '
         this.curCommonChars.push(char);

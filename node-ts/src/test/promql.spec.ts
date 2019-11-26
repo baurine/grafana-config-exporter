@@ -13,6 +13,9 @@ describe("test parser", function() {
     "histogram_quantile(0.99, sum(rate(tidb_session_transaction_duration_seconds_bucket{}[1m])) by (le, sql_type))";
   const promQLBys =
     'sum(increase(node_cpu_seconds_total{mode!="idle"}[3m])) by (instance) / sum(increase(node_cpu_seconds_total[3m])) by (instance)';
+  const promQLLt =
+    'delta(tikv_raftstore_region_count{instance=~"$instance", type="leader"}[30s]) < -10';
+  const promQLEqual = 'count(probe_success{group="tidb"} == 1)';
 
   const placeHolder = "PLACE_HOLDER";
 
@@ -67,5 +70,16 @@ describe("test parser", function() {
     let targetPromQL =
       'sum(increase(node_cpu_seconds_total{mode!="idle", PLACE_HOLDER}[3m])) by (instance) / sum(increase(node_cpu_seconds_total{PLACE_HOLDER}[3m])) by (instance)';
     expect(genNewPromQL(promQLBys, placeHolder)).toBe(targetPromQL);
+  });
+
+  it("should handle `<` correctly", function() {
+    let targetPromQL =
+      'delta(tikv_raftstore_region_count{type="leader", PLACE_HOLDER}[30s]) < -10';
+    expect(genNewPromQL(promQLLt, placeHolder)).toBe(targetPromQL);
+  });
+
+  it("should handle `==` correctly", function() {
+    let targetPromQL = 'count(probe_success{group="tidb", PLACE_HOLDER} == 1)';
+    expect(genNewPromQL(promQLEqual, placeHolder)).toBe(targetPromQL);
   });
 });
