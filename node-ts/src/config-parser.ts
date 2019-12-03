@@ -36,6 +36,7 @@ export function checkConfig() {
     console.log("clean_variables_in_tag is not defined, set default to false");
     config.clean_variables_in_tag = false;
   }
+  console.log(config);
   return ok;
 }
 

@@ -37,7 +37,10 @@ async function request(apiPath: string): Promise<IRes> {
   })
     .then(parseResponse)
     .then(data => ({ data }))
-    .catch(err => ({ err }));
+    .catch(err => {
+      console.log(err);
+      return { err };
+    });
 }
 
 ////////////////////////////////
@@ -105,12 +108,12 @@ export function convertDbDetail(dbDetail: any): ISection {
 
     panels: (dbDetail.panels || []).map((panel: any) => {
       let newPanel = {
-        panelKey: panel.id,
+        panelKey: genIdByTitle(panel.title) || panel.id,
         title: panel.title,
 
         subPanels: (panel.panels || []).map((subPanel: any) => {
           return {
-            subPanelKey: subPanel.id,
+            subPanelKey: genIdByTitle(subPanel.title) || subPanel.id,
             title: subPanel.title,
 
             targets: transformTargets(subPanel.targets),
@@ -122,6 +125,7 @@ export function convertDbDetail(dbDetail: any): ISection {
       };
       if (panel.targets) {
         newPanel.subPanels.push({
+          subPanelKey: genIdByTitle(panel.title) || panel.id,
           title: panel.title,
           targets: transformTargets(panel.targets),
           yaxis: (panel.yaxes || []).map((yaxis: any) => ({
@@ -132,6 +136,14 @@ export function convertDbDetail(dbDetail: any): ISection {
       return newPanel;
     })
   };
+}
+
+function genIdByTitle(title: string): string {
+  return title
+    .split(/[\s\(\)&\/\[\]]/)
+    .filter(s => /\w/.test(s))
+    .map(item => item.toLowerCase())
+    .join("_");
 }
 
 function transformTargets(targets: any[]): ITarget[] | undefined {

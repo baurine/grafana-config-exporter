@@ -10,8 +10,11 @@ import { dirname } from "path";
 async function fetchAndSaveDashboard(dbUid: string) {
   const dbDetail = await fetchDbDetail(dbUid);
   if (dbDetail === undefined) {
+    console.log(`fetch err: ${dbUid}`);
     return;
   }
+  console.log(`fetch ok: ${dbUid}`);
+
   const convertedDb = convertDbDetail(dbDetail);
   const jsonContent = JSON.stringify(convertedDb, null, 2);
   const filePath = `${__dirname}/output/${convertedDb.title.toLowerCase()}.json`;
